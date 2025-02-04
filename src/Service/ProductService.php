@@ -1,8 +1,9 @@
 <?php
 namespace Contatoseguro\TesteBackend\Service;
 
-use Contatoseguro\TesteBackend\Config\DB;
 use PDO;
+use Contatoseguro\TesteBackend\Config\DB;
+use Contatoseguro\TesteBackend\Model\Product;
 
 class ProductService
 {
@@ -12,26 +13,45 @@ class ProductService
         $this->pdo = DB::connect();
     }
 
-    public function getAll($adminUserId)
+    public function getAll(int $adminUserId, array $filters = [])
     {
-        $query = "
-        SELECT p.id, p.company_id, p.title, p.price, p.active, p.created_at,
-               GROUP_CONCAT(c.title) AS categories
-        FROM product p
-        INNER JOIN product_category pc ON pc.product_id = p.id
-        INNER JOIN category c ON c.id = pc.cat_id
-        WHERE p.company_id = {$adminUserId}
-        GROUP BY p.id
-    ";
+        $sql = "
+            SELECT p.id, p.company_id, p.title, p.price, p.active, p.created_at,
+                   GROUP_CONCAT(c.title) AS categories
+            FROM product p
+            INNER JOIN product_category pc ON pc.product_id = p.id
+            INNER JOIN category c ON c.id = pc.cat_id
+            WHERE p.company_id = :adminUserId
+        ";
     
+        $params = ['adminUserId' => $adminUserId];
     
+        if (isset($filters['active'])) {
+            $sql .= " AND p.active = :active";
+            $params['active'] = (int) $filters['active'];
+        }
+    
+        if (!empty($filters['category'])) {
+            $sql .= " AND c.title = :category";
+            $params['category'] = $filters['category'];
+        }
+    
+        $sql .= " GROUP BY p.id";
+    
+        if (!empty($filters['orderBy']) && strtolower($filters['orderBy']) === 'desc') {
+            $sql .= " ORDER BY p.created_at DESC";
+        } else {
+            $sql .= " ORDER BY p.created_at ASC";
+        }
+    
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
 
-        $stm = $this->pdo->prepare($query);
+        $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $stm->execute();
-
-        return $stm;
+        return array_map(fn($p) => Product::hydrateByFetch($p), $products);
     }
+    
 
     public function getOne($id)
     {
@@ -47,10 +67,7 @@ class ProductService
         $stm->execute();
         
         return $stm->fetch(PDO::FETCH_ASSOC);
-    }
-    
-    
-    
+    } 
     
 
     public function insertOne($body, $adminUserId)
@@ -103,81 +120,90 @@ class ProductService
     }
 
     public function updateOne($id, $body, $adminUserId)
-    {
-        $stm = $this->pdo->prepare("
-            UPDATE product
-            SET company_id = {$body['company_id']},
-                title = '{$body['title']}',
-                price = {$body['price']},
-                active = {$body['active']}
-            WHERE id = {$id}
-        ");
-        if (! $stm->execute()) {
-            return false;
-        }
-
-        $stm = $this->pdo->prepare("
-            UPDATE product_category
-            SET cat_id = {$body['category_id']}
-            WHERE product_id = {$id}
-        ");
-        if (! $stm->execute()) {
-            return false;
-        }
-
-        $stm = $this->pdo->prepare("
-            INSERT INTO product_log (
-                product_id,
-                admin_user_id,
-                `action`
-            ) VALUES (
-                {$id},
-                {$adminUserId},
-                'update'
-            )
-        ");
-
-        return $stm->execute();
+{
+    $stm = $this->pdo->prepare("
+        UPDATE product
+        SET company_id = {$body['company_id']},
+            title = '{$body['title']}',
+            price = {$body['price']},
+            active = {$body['active']}
+        WHERE id = {$id}
+    ");
+    if (!$stm->execute()) {
+        return false;
     }
 
-    public function deleteOne($id, $adminUserId)
-    {
-        $stm = $this->pdo->prepare("
-            DELETE FROM product_category WHERE product_id = {$id}
-        ");
-        if (! $stm->execute()) {
-            return false;
-        }
-
-        $stm = $this->pdo->prepare("DELETE FROM product WHERE id = {$id}");
-        if (! $stm->execute()) {
-            return false;
-        }
-
-        $stm = $this->pdo->prepare("
-            INSERT INTO product_log (
-                product_id,
-                admin_user_id,
-                `action`
-            ) VALUES (
-                {$id},
-                {$adminUserId},
-                'delete'
-            )
-        ");
-
-        return $stm->execute();
+    $stm = $this->pdo->prepare("
+        UPDATE product_category
+        SET cat_id = {$body['category_id']}
+        WHERE product_id = {$id}
+    ");
+    if (!$stm->execute()) {
+        return false;
     }
 
-    public function getLog($id)
-    {
-        $stm = $this->pdo->prepare("
-            SELECT *
-            FROM product_log
-            WHERE product_id = {$id}
-        ");
-        $stm->execute();
+    $stm = $this->pdo->prepare("
+        INSERT INTO product_log (
+            product_id,
+            admin_user_id,
+            `action`,
+            created_at
+        ) VALUES (
+            {$id},
+            {$adminUserId},
+            'update',
+            NOW()
+        )
+    ");
+    return $stm->execute();
+}
 
-        return $stm;
+
+public function deleteOne($id, $adminUserId)
+{
+    $stm = $this->pdo->prepare("
+        DELETE FROM product_category WHERE product_id = {$id}
+    ");
+    if (!$stm->execute()) {
+        return false;
     }
+
+    $stm = $this->pdo->prepare("DELETE FROM product WHERE id = {$id}");
+    if (!$stm->execute()) {
+        return false;
+    }
+
+    $stm = $this->pdo->prepare("
+        INSERT INTO product_log (
+            product_id,
+            admin_user_id,
+            `action`,
+            created_at
+        ) VALUES (
+            {$id},
+            {$adminUserId},
+            'delete',
+            NOW()
+        )
+    ");
+    return $stm->execute();
+}
+
+public function getLog($id)
+{
+    $stm = $this->pdo->prepare("
+        SELECT product_log.*, admin_user.name as user_name
+        FROM product_log
+        LEFT JOIN admin_user ON admin_user.id = product_log.admin_user_id
+        WHERE product_log.product_id = :id
+    ");
+    $stm->bindParam(':id', $id, PDO::PARAM_INT);
+    $stm->execute();
+
+    return $stm;
+}
+
+
+
+
 }

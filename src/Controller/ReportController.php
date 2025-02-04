@@ -33,30 +33,67 @@ class ReportController
             'Logs de Alterações'
         ];
         
-        $stm = $this->productService->getAll($adminUserId);
-        $products = $stm->fetchAll();
-
+        $products = $this->productService->getAll($adminUserId);
+    
         foreach ($products as $i => $product) {
             $stm = $this->companyService->getNameById($product->company_id);
-            $companyName = $stm->fetch()->name;
-
+            
+            if (is_array($stm)) {
+                $companyName = $stm['name'];
+            } else {
+                $companyName = $stm->fetch()->name;
+            }
+        
             $stm = $this->productService->getLog($product->id);
             $productLogs = $stm->fetchAll();
-            
+        
             $data[$i+1][] = $product->id;
             $data[$i+1][] = $companyName;
             $data[$i+1][] = $product->title;
             $data[$i+1][] = $product->price;
-            $data[$i+1][] = $product->category;
-            $data[$i+1][] = $product->created_at;
-            $data[$i+1][] = $productLogs;
-        }
+            $data[$i+1][] = implode(', ', $product->category);
+            $data[$i+1][] = isset($product->createdAt) ? $product->createdAt : 'N/A';
         
-        $report = "<table style='font-size: 10px;'>";
+            $logText = '';
+            if (empty($productLogs)) {
+                $logText = '(Desconhecido, Ação desconhecida, Sem informações)'; 
+            } else {
+                foreach ($productLogs as $log) {
+                    $userName = isset($log->user_name) ? ucfirst($log->user_name) : 'Desconhecido';
+                    $action = strtolower($log->action);
+                    $logDate = isset($log->timestamp) ? date('d/m/Y H:i:s', strtotime($log->timestamp)) : 'N/A';
+        
+                    switch ($action) {
+                        case 'create':
+                            $action = 'Criação';
+                            break;
+                        case 'update':
+                            $action = 'Atualização';
+                            break;
+                        case 'delete':
+                            $action = 'Remoção';
+                            break;
+                        default:
+                            $action = 'Ação Desconhecida';
+                            break;
+                    }
+        
+                    $logText .= "({$userName}, {$action}, {$logDate}), ";
+                }
+            }
+        
+            $logText = rtrim($logText, ', ');
+        
+            $data[$i+1][] = $logText;
+        }      
+        
+        
+        
+        $report = "<table style='font-size: 10px; border: 1px solid #ddd; border-collapse: collapse;'>";
         foreach ($data as $row) {
             $report .= "<tr>";
             foreach ($row as $column) {
-                $report .= "<td>{$column}</td>";
+                $report .= "<td style='border: 1px solid #ddd; padding: 5px;'>{$column}</td>";
             }
             $report .= "</tr>";
         }
@@ -65,4 +102,5 @@ class ReportController
         $response->getBody()->write($report);
         return $response->withStatus(200)->withHeader('Content-Type', 'text/html');
     }
+    
 }

@@ -9,7 +9,7 @@ class Product
 
     public function __construct(
         public int $id,
-        public int $companyId,
+        public int $company_id,
         public string $title,
         public float $price,
         public bool $active,
