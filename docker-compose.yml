@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  db:
+    image: alpine:latest
+    container_name: sqlite-db
+    volumes:
+      - ./data:/data
+    command: sh -c "apk add --no-cache sqlite && tail -f /dev/null"
+    restart: always
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api
+    ports:
+      - "8000:80" 
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=sqlite:/data/db.sqlite 
+    volumes:
+      - .:/var/www/html
+    restart: always
