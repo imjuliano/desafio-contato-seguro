@@ -79,4 +79,6 @@ Sinta-se a vontade para refatorar o que achar pertinente, considerando questões
 Boa sorte! :)
 
 ## Suas Respostas, Duvidas e Observações
-[Adicione  aqui suas respostas, dúvidas e observações]
+Consegui resolver todas as 7 demandas solicitadas e também fiz a configuração do Docker pra utilizar em Containers
+Só fiquei com uma pequena dúvida no item de "- [ ] Gostaria de saber qual usuário mudou o preço do produto `iphone 8` por último.", acabei fazendo uma rota nova /report/<id> do produto
+para conseguir visualizar o usuário que mudou por último o preço de qualquer produto, não sei se era exatamente isso mas qualquer coisa só me avisar!
