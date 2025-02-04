@@ -1,8 +1,8 @@
 <?php
-
 namespace Contatoseguro\TesteBackend\Service;
 
 use Contatoseguro\TesteBackend\Config\DB;
+use PDO;
 
 class ProductService
 {
@@ -15,12 +15,16 @@ class ProductService
     public function getAll($adminUserId)
     {
         $query = "
-            SELECT p.*, c.title as category
-            FROM product p
-            INNER JOIN product_category pc ON pc.product_id = p.id
-            INNER JOIN category c ON c.id = pc.id
-            WHERE p.company_id = {$adminUserId}
-        ";
+        SELECT p.id, p.company_id, p.title, p.price, p.active, p.created_at,
+               GROUP_CONCAT(c.title) AS categories
+        FROM product p
+        INNER JOIN product_category pc ON pc.product_id = p.id
+        INNER JOIN category c ON c.id = pc.cat_id
+        WHERE p.company_id = {$adminUserId}
+        GROUP BY p.id
+    ";
+    
+    
 
         $stm = $this->pdo->prepare($query);
 
@@ -32,14 +36,22 @@ class ProductService
     public function getOne($id)
     {
         $stm = $this->pdo->prepare("
-            SELECT *
-            FROM product
-            WHERE id = {$id}
+            SELECT p.*, GROUP_CONCAT(c.title) AS categories
+            FROM product p
+            LEFT JOIN product_category pc ON p.id = pc.product_id
+            LEFT JOIN category c ON pc.cat_id = c.id
+            WHERE p.id = :id
+            GROUP BY p.id
         ");
+        $stm->bindParam(':id', $id, PDO::PARAM_INT);
         $stm->execute();
-
-        return $stm;
+        
+        return $stm->fetch(PDO::FETCH_ASSOC);
     }
+    
+    
+    
+    
 
     public function insertOne($body, $adminUserId)
     {
@@ -56,8 +68,9 @@ class ProductService
                 {$body['active']}
             )
         ");
-        if (!$stm->execute())
+        if (! $stm->execute()) {
             return false;
+        }
 
         $productId = $this->pdo->lastInsertId();
 
@@ -70,8 +83,9 @@ class ProductService
                 {$body['category_id']}
             );
         ");
-        if (!$stm->execute())
+        if (! $stm->execute()) {
             return false;
+        }
 
         $stm = $this->pdo->prepare("
             INSERT INTO product_log (
@@ -98,16 +112,18 @@ class ProductService
                 active = {$body['active']}
             WHERE id = {$id}
         ");
-        if (!$stm->execute())
+        if (! $stm->execute()) {
             return false;
+        }
 
         $stm = $this->pdo->prepare("
             UPDATE product_category
             SET cat_id = {$body['category_id']}
             WHERE product_id = {$id}
         ");
-        if (!$stm->execute())
+        if (! $stm->execute()) {
             return false;
+        }
 
         $stm = $this->pdo->prepare("
             INSERT INTO product_log (
@@ -129,12 +145,14 @@ class ProductService
         $stm = $this->pdo->prepare("
             DELETE FROM product_category WHERE product_id = {$id}
         ");
-        if (!$stm->execute())
+        if (! $stm->execute()) {
             return false;
-        
+        }
+
         $stm = $this->pdo->prepare("DELETE FROM product WHERE id = {$id}");
-        if (!$stm->execute())
+        if (! $stm->execute()) {
             return false;
+        }
 
         $stm = $this->pdo->prepare("
             INSERT INTO product_log (

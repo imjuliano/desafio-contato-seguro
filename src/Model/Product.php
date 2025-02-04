@@ -19,15 +19,26 @@ class Product
 
     public static function hydrateByFetch($fetch): self
     {
-        return new self(
-            $fetch->id,
-            $fetch->company_id,
-            $fetch->title,
-            $fetch->price,
-            $fetch->active,
-            $fetch->created_at
+        $product = new self(
+            $fetch['id'],
+            $fetch['company_id'],
+            $fetch['title'],
+            $fetch['price'],
+            $fetch['active'],
+            $fetch['created_at']
         );
+    
+        if (!empty($fetch['categories'])) {
+            $categories = explode(',', $fetch['categories']); 
+            $product->setCategory($categories); 
+        } else {
+            $product->setCategory([]); 
+        }
+    
+        return $product;
     }
+    
+    
 
     public function setCategory($category)
     {
