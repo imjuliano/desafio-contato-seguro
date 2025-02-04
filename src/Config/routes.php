@@ -33,3 +33,4 @@ $app->group('/categories', function (RouteCollectorProxy $group) {
 });
 
 $app->get('/report', [ReportController::class, 'generate']);
+$app->get('/report/{id}', [ReportController::class, 'generateForProduct']);

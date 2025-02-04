@@ -203,7 +203,19 @@ public function getLog($id)
     return $stm;
 }
 
+public function getLastPriceChange($productId)
+{
+    $stm = $this->pdo->prepare("
+        SELECT au.name AS user_name, pl.timestamp
+        FROM product_log pl
+        LEFT JOIN admin_user au ON au.id = pl.admin_user_id
+        WHERE pl.product_id = :product_id AND pl.action = 'update'
+        ORDER BY pl.timestamp DESC LIMIT 1
+    ");
+    $stm->bindParam(':product_id', $productId, PDO::PARAM_INT);
+    $stm->execute();
 
-
+    return $stm->fetch(PDO::FETCH_OBJ); 
+}
 
 }

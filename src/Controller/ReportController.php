@@ -6,6 +6,8 @@ use Contatoseguro\TesteBackend\Service\CompanyService;
 use Contatoseguro\TesteBackend\Service\ProductService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Slim\Psr7\Request;
+use Slim\Psr7\Response;
 
 class ReportController
 {
@@ -102,5 +104,39 @@ class ReportController
         $response->getBody()->write($report);
         return $response->withStatus(200)->withHeader('Content-Type', 'text/html');
     }
+
+    public function generateForProduct(Request $request, Response $response, $args)
+    {
+        $productId = (int) $args['id']; 
+    
+        $product = $this->productService->getOne($productId);
+        $lastPriceChange = $this->productService->getLastPriceChange($productId); 
+    
+        $lastPriceLog = $lastPriceChange ?
+            "Última alteração de preço: {$lastPriceChange->user_name}, {$lastPriceChange->timestamp}" :
+            "Nenhuma alteração de preço registrada.";
+    
+        $responseData = [
+            'product_id' => $productId,
+            'product_name' => $product['title'],
+            'last_price_change' => $lastPriceLog 
+        ];
+    
+        $response->getBody()->write(json_encode($responseData));
+    
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+    
+    
+
+    public function getProductLog($request, $response, $args)
+{
+    $productId = $args['id'];
+    $productService = new ProductService();
+    $logs = $productService->getLog($productId);
+
+    return $response->withJson($logs);
+}
+
     
 }
